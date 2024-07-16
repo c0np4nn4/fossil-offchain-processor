@@ -1,3 +1,22 @@
+//! Manages user requests for specific historical Ethereum account storage values.
+//! Coordinates interactions with backend components to retrieve and verify storage values,
+//! and stores them on Starknet if necessary.
+//!
+//! # Steps
+//!
+//! 1. **Request Storage**:
+//!    - Requests the storage value for a given Ethereum account at a specified block number.
+//!    - If the storage value is available, it returns the value directly.
+//! 2. **Request State Root**:
+//!    - If the storage value is not available, requests the state root for the specified block number.
+//!    - If the state root is not available, calls an external API to retrieve it.
+//!    - Stores the retrieved state root.
+//! 3. **Check Account Proof Status on Starknet**:
+//!    - Checks if the account has already been verified on Starknet.
+//! 4. **Call eth_getProof**:
+//!    - Calls the eth_getProof method to retrieve the storage proof.
+//!    - If the account is not verified, verifies the account on Starknet using the retrieved proof.
+//!    - Finally, verifies the storage proof on Starknet.
 use axum::{extract::State, response::IntoResponse, Json};
 use dotenv::dotenv;
 use reqwest::StatusCode;
@@ -24,14 +43,32 @@ use starknet_handler::{
     fact_registry::fact_registry::FactRegistry, l1_headers_store::l1_headers_store::L1HeadersStore,
 };
 
+/// Struct representing a storage request from the user.
 #[derive(Deserialize, Clone)]
 pub struct StorageRequest {
+    /// The block number to query.
     pub block_number: u64,
+    /// The Ethereum account address.
     pub account_address: String,
+    /// The storage slot to query.
     pub slot: String,
+    /// A list of storage keys.
     pub storage_keys: Vec<String>,
 }
 
+/// Handles user requests to get storage values.
+///
+/// This function coordinates the entire process of receiving a request for Ethereum account storage values,
+/// checking their availability, retrieving necessary state roots, verifying proofs, and storing data on Starknet.
+///
+/// # Arguments
+///
+/// * `State(app_state)` - The application state containing necessary configuration and clients.
+/// * `Json(input)` - The JSON payload containing the storage request details.
+///
+/// # Returns
+///
+/// * `impl IntoResponse` - The response to be sent back to the user.
 pub async fn get_storage_value(
     State(app_state): State<AppState>,
     Json(input): Json<StorageRequest>,
@@ -73,7 +110,7 @@ pub async fn get_storage_value(
     tracing::info!("Request storage");
     let response_storage = fact_registry_contract
         .get_storage(
-            input.block_number, //
+            input.block_number,
             U256::from_str(&input.account_address).unwrap(),
             input.slot.clone(),
         )
@@ -161,7 +198,10 @@ pub async fn get_storage_value(
                 println!("bytes: {:?}", bytes);
 
                 if bytes.len() < 68 {
-                    tracing::error!("Response body too short, expected at least 68 bytes, got {}", bytes.len());
+                    tracing::error!(
+                        "Response body too short, expected at least 68 bytes, got {}",
+                        bytes.len()
+                    );
                     return (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json("Response body too short"),

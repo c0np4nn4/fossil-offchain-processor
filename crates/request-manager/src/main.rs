@@ -1,3 +1,21 @@
+//! # User Request Manager
+//!
+//! The User Request Manager is responsible for managing user requests for specific historical
+//! Ethereum account storage values and coordinating interactions with backend components.
+//!
+//! ## Usage
+//! Run the application using the following command:
+//! ```sh
+//! cargo run
+//! ```
+//!
+//! ## Example
+//!
+//! To request storage value, send a POST request to `/get-storage` endpoint with the appropriate payload:
+//! ```sh
+//! curl -X POST http://localhost:8000/get-storage -d '{"block_number": 123456, "account_address": "0x...", "slot": "0x...", "storage_keys": ["0x..."]}'
+//! ```
+
 use axum::{extract::MatchedPath, http::Request, routing::post, Router};
 use reqwest::Client;
 use tower_http::trace::TraceLayer;
